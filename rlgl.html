@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Red Light Green Light — CO 543</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=DM+Mono:wght@400;500&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --red:    #e8162a;
+    --green:  #00c96b;
+    --yellow: #f5c518;
+    --bg:     #0a0a0b;
+    --panel:  #111114;
+    --border: #1e1e24;
+    --text:   #e8e8ec;
+    --muted:  #55555e;
+    --accent: #fff;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0,201,107,.05), transparent 70%);
+    transition: background 0.6s ease;
+  }
+  body.state-red::before   { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(232,22,42,.09),  transparent 70%); }
+  body.state-dead::before  { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(232,22,42,.18),  transparent 70%); }
+  body.state-warn::before  { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(245,197,24,.07), transparent 70%); }
+  body.state-green::before { background: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(0,201,107,.08),  transparent 70%); }
+
+  header {
+    position: relative; z-index: 2;
+    width: 100%; max-width: 1100px;
+    padding: 28px 32px 0;
+    display: flex; align-items: baseline; gap: 14px;
+  }
+  header h1 {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(1.6rem, 4vw, 2.2rem);
+    letter-spacing: .04em; color: var(--accent);
+  }
+  header span {
+    font-family: 'DM Mono', monospace;
+    font-size: .72rem; color: var(--muted);
+    letter-spacing: .12em; text-transform: uppercase;
+  }
+  main {
+    position: relative; z-index: 2;
+    width: 100%; max-width: 1100px;
+    padding: 20px 32px 40px;
+    display: grid; grid-template-columns: 300px 1fr; gap: 20px; align-items: start;
+  }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+    display: flex; flex-direction: column; gap: 18px;
+  }
+  .status-banner {
+    border-radius: 8px; padding: 12px 16px;
+    font-family: 'DM Mono', monospace; font-size: .82rem; font-weight: 500;
+    letter-spacing: .06em; background: #1a1a1f; color: var(--muted);
+    transition: background .3s, color .3s; min-height: 46px;
+    display: flex; align-items: center;
+  }
+  .status-banner.green { background: rgba(0,201,107,.12); color: var(--green); }
+  .status-banner.red   { background: rgba(232,22,42,.14); color: var(--red); }
+  .status-banner.warn  { background: rgba(245,197,24,.12); color: var(--yellow); }
+  .status-banner.dead  { background: rgba(232,22,42,.22); color: var(--red); }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stat-box {
+    background: #0d0d10; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px;
+  }
+  .stat-label { font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .stat-value { font-family: 'DM Mono', monospace; font-size: 1.1rem; font-weight: 500; color: var(--accent); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.red   { color: var(--red); }
+  .stat-value.warn  { color: var(--yellow); }
+  .meter-section { display: flex; flex-direction: column; gap: 10px; }
+  .meter-label {
+    font-size: .65rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+  .meter-track { height: 6px; background: #1a1a1f; border-radius: 999px; overflow: hidden; }
+  .meter-fill {
+    height: 100%; border-radius: 999px; transition: width .12s linear, background .3s;
+    background: var(--green); width: 0%;
+  }
+  .meter-fill.red  { background: var(--red); }
+  .meter-fill.warn { background: var(--yellow); }
+  .light-row { display: flex; gap: 10px; align-items: center; }
+  .light {
+    width: 14px; height: 14px; border-radius: 50%; background: #1e1e24; flex-shrink: 0;
+    box-shadow: none; transition: background .3s, box-shadow .3s;
+  }
+  .light.green.on { background: var(--green); box-shadow: 0 0 10px 2px rgba(0,201,107,.5); }
+  .light.red.on   { background: var(--red);   box-shadow: 0 0 10px 2px rgba(232,22,42,.55); }
+  .light-text { font-family: 'DM Mono', monospace; font-size: .75rem; color: var(--muted); transition: color .3s; }
+  .light-text.green { color: var(--green); }
+  .light-text.red   { color: var(--red); }
+  .light-text.warn  { color: var(--yellow); }
+  .btn-row { display: flex; gap: 10px; }
+  button {
+    flex: 1; padding: 11px 0; border: none; border-radius: 8px;
+    font-family: 'DM Mono', monospace; font-size: .8rem; font-weight: 500;
+    letter-spacing: .08em; text-transform: uppercase;
+    cursor: pointer; transition: opacity .2s, transform .1s;
+  }
+  button:active { transform: scale(.97); }
+  #btn-start   { background: var(--green); color: #000; }
+  #btn-restart { background: #1e1e24; color: var(--text); }
+  button:disabled { opacity: .35; cursor: not-allowed; }
+  .cam-wrapper {
+    position: relative; border-radius: 12px; overflow: hidden;
+    background: #060608; border: 1px solid var(--border);
+    aspect-ratio: 4/3; transition: box-shadow .4s;
+  }
+  .cam-wrapper.green { box-shadow: 0 0 0 2px var(--green), 0 0 32px rgba(0,201,107,.25); }
+  .cam-wrapper.red   { box-shadow: 0 0 0 2px var(--red),   0 0 32px rgba(232,22,42,.3); }
+  .cam-wrapper.warn  { box-shadow: 0 0 0 2px var(--yellow), 0 0 32px rgba(245,197,24,.2); }
+  .cam-wrapper.dead  { box-shadow: 0 0 0 2px var(--red),   0 0 60px rgba(232,22,42,.5); }
+  #cam-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; }
+  #cam-canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .cam-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    pointer-events: none; opacity: 0; transition: opacity .35s;
+  }
+  .cam-overlay.visible { opacity: 1; }
+  .overlay-dead  { background: rgba(0,0,0,.7); }
+  .overlay-dead .big-x {
+    font-family: 'Black Han Sans', sans-serif; font-size: clamp(5rem,18vw,9rem);
+    color: var(--red); line-height: 1;
+    text-shadow: 0 0 40px rgba(232,22,42,.8);
+    animation: pulse-x 1.1s ease-in-out infinite alternate;
+  }
+  .overlay-dead .death-label {
+    font-family: 'Black Han Sans', sans-serif; font-size: clamp(1.2rem,4vw,2rem);
+    letter-spacing: .12em; color: #fff; margin-top: 10px;
+    text-shadow: 0 2px 20px rgba(0,0,0,.9);
+  }
+  @keyframes pulse-x { from { transform: scale(1); } to { transform: scale(1.06); } }
+  .overlay-levelup { background: rgba(0,0,0,.65); }
+  .overlay-levelup .lvl-text {
+    font-family: 'Black Han Sans', sans-serif; font-size: clamp(1.4rem,5vw,2.6rem);
+    letter-spacing: .1em; color: var(--green);
+    text-shadow: 0 0 30px rgba(0,201,107,.7);
+    animation: pop-in .4s cubic-bezier(.2,1.6,.4,1) both;
+  }
+  @keyframes pop-in { from { transform: scale(.5); opacity:0; } to { transform: scale(1); opacity:1; } }
+  .cam-placeholder {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 10px;
+    color: var(--muted); font-size: .85rem; letter-spacing: .06em;
+  }
+  .cam-placeholder svg { opacity: .3; }
+  .divider { height: 1px; background: var(--border); }
+  .cycle-dots { display: flex; gap: 6px; flex-wrap: wrap; }
+  .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #1e1e24; border: 1px solid var(--border); transition: background .3s;
+  }
+  .dot.done { background: var(--green); border-color: var(--green); }
+  .dot.curr { background: var(--yellow); border-color: var(--yellow); }
+  .flash-overlay {
+    position: fixed; inset: 0; pointer-events: none; z-index: 100;
+    opacity: 0; transition: opacity .08s;
+  }
+  .flash-overlay.flash-red   { background: rgba(232,22,42,.22); }
+  .flash-overlay.flash-green { background: rgba(0,201,107,.18); }
+  @media (max-width: 700px) {
+    main { grid-template-columns: 1fr; padding: 16px; }
+    header { padding: 20px 16px 0; }
+  }
+</style>
+</head>
+<body class="state-idle">
+
+<div class="flash-overlay" id="flash"></div>
+
+<header>
+  <h1>Red Light Green Light</h1>
+  <span>CO 543 — Machine Exercise 1</span>
+</header>
+
+<main>
+  <!-- LEFT PANEL -->
+  <div class="panel">
+    <div class="status-banner" id="status-banner">Waiting to start…</div>
+
+    <div class="stats">
+      <div class="stat-box">
+        <div class="stat-label">Level</div>
+        <div class="stat-value" id="stat-level">—</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Cycle</div>
+        <div class="stat-value" id="stat-cycle">—</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">State</div>
+        <div class="stat-value" id="stat-state">—</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Motion</div>
+        <div class="stat-value" id="stat-motion">0.000</div>
+      </div>
+    </div>
+
+    <div class="light-row">
+      <div class="light green" id="light-green"></div>
+      <div class="light red"   id="light-red"></div>
+      <div class="light-text"  id="light-text">—</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="meter-section">
+      <div class="meter-label"><span>Motion Score</span><span id="motion-val">0.000</span></div>
+      <div class="meter-track"><div class="meter-fill" id="motion-bar"></div></div>
+
+      <div class="meter-label"><span>Phase Timer</span><span id="phase-val">—</span></div>
+      <div class="meter-track"><div class="meter-fill" id="phase-bar"></div></div>
+
+      <div class="meter-label"><span>Idle / Grace</span><span id="idle-val">—</span></div>
+      <div class="meter-track"><div class="meter-fill" id="idle-bar"></div></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div>
+      <div class="meter-label" style="margin-bottom:8px"><span>Cycle Progress (Level)</span></div>
+      <div class="cycle-dots" id="cycle-dots"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="btn-row">
+      <button id="btn-start">Start Game</button>
+      <button id="btn-restart">Restart</button>
+    </div>
+  </div>
+
+  <!-- CAMERA PANEL -->
+  <div class="cam-wrapper" id="cam-wrapper">
+    <div class="cam-placeholder" id="cam-placeholder">
+      <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M15 10l4.553-2.276A1 1 0 0121 8.723v6.554a1 1 0 01-1.447.894L15 14M4 8h9a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4a2 2 0 012-2z"/>
+      </svg>
+      <span>Camera not started</span>
+    </div>
+    <video id="cam-video" autoplay muted playsinline></video>
+    <canvas id="cam-canvas"></canvas>
+
+    <div class="cam-overlay overlay-dead" id="overlay-dead">
+      <div class="big-x">✕</div>
+      <div class="death-label" id="death-label">You Died!</div>
+    </div>
+    <div class="cam-overlay overlay-levelup" id="overlay-levelup">
+      <div class="lvl-text" id="levelup-text">LEVEL UP!</div>
+    </div>
+  </div>
+</main>
+
+<canvas id="proc-canvas" style="display:none"></canvas>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  CONFIG  (CO 543 ME1 spec baseline parameters)
+// ═══════════════════════════════════════════════════════════════
+const CFG = {
+  GREEN_MOVE_THRESHOLD:    0.04,
+  RED_MOVE_THRESHOLD_BASE: 0.055,
+  RED_GRACE_MS:    650,
+  IDLE_WARNING_MS: 1800,
+  IDLE_DEATH_MS:   3600,
+  GREEN_MIN: 2600, GREEN_MAX: 4200,
+  RED_MIN:   1700, RED_MAX:   2900,
+  CYCLES_PER_LEVEL: 3,
+  LEVEL_SCALE: 0.85,     // each level shortens durations by 15%
+  PROC_WIDTH: 640,        // downscale for performance
+  MOTION_SMOOTH: 0.30,    // EMA alpha for smoothed score display
+};
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE MACHINE
+// ═══════════════════════════════════════════════════════════════
+const S = { IDLE:'IDLE', GREEN:'GREEN', WARNING:'WARNING', RED:'RED', DEAD:'DEAD', LEVEL_UP:'LEVEL_UP' };
+let state = S.IDLE;
+
+// Game progress
+let level = 1, cycle = 0;
+const cyclesNeeded = CFG.CYCLES_PER_LEVEL;
+
+// Phase timing
+let phaseStart = 0, phaseDur = 0;
+
+// Idle tracking (GREEN/WARNING)
+let idleStart = 0;
+
+// RED grace tracking
+let graceStart = 0;
+
+// Motion
+let rawMotion = 0, smoothMotion = 0;
+
+// Misc
+let deathReason = '';
+let camStream   = null;
+let rafId       = null;
+let prevGray    = null;  // Uint8Array — previous grayscale frame
+
+// ═══════════════════════════════════════════════════════════════
+//  DOM
+// ═══════════════════════════════════════════════════════════════
+const video        = document.getElementById('cam-video');
+const canvas       = document.getElementById('cam-canvas');
+const ctx          = canvas.getContext('2d');
+const procCanvas   = document.getElementById('proc-canvas');
+const procCtx      = procCanvas.getContext('2d');
+
+const statusBanner = document.getElementById('status-banner');
+const statLevel    = document.getElementById('stat-level');
+const statCycle    = document.getElementById('stat-cycle');
+const statState    = document.getElementById('stat-state');
+const statMotion   = document.getElementById('stat-motion');
+const lightGreen   = document.getElementById('light-green');
+const lightRed     = document.getElementById('light-red');
+const lightText    = document.getElementById('light-text');
+const motionVal    = document.getElementById('motion-val');
+const motionBar    = document.getElementById('motion-bar');
+const phaseVal     = document.getElementById('phase-val');
+const phaseBar     = document.getElementById('phase-bar');
+const idleVal      = document.getElementById('idle-val');
+const idleBar      = document.getElementById('idle-bar');
+const cycleDots    = document.getElementById('cycle-dots');
+const camWrapper   = document.getElementById('cam-wrapper');
+const overlayDead  = document.getElementById('overlay-dead');
+const overlayLvl   = document.getElementById('overlay-levelup');
+const deathLabel   = document.getElementById('death-label');
+const levelupText  = document.getElementById('levelup-text');
+const camPlaceholder = document.getElementById('cam-placeholder');
+const btnStart     = document.getElementById('btn-start');
+const btnRestart   = document.getElementById('btn-restart');
+const flashEl      = document.getElementById('flash');
+
+// ═══════════════════════════════════════════════════════════════
+//  HELPERS
+// ═══════════════════════════════════════════════════════════════
+const rand = (a,b) => Math.random()*(b-a)+a;
+
+// Duration shortens with each level
+const greenDur = () => rand(
+  CFG.GREEN_MIN * Math.pow(CFG.LEVEL_SCALE, level-1),
+  CFG.GREEN_MAX * Math.pow(CFG.LEVEL_SCALE, level-1)
+);
+const redDur = () => rand(
+  CFG.RED_MIN * Math.pow(CFG.LEVEL_SCALE, level-1),
+  CFG.RED_MAX * Math.pow(CFG.LEVEL_SCALE, level-1)
+);
+// RED threshold tightens with level
+const redThresh = () => CFG.RED_MOVE_THRESHOLD_BASE * Math.pow(0.92, level-1);
+
+function flash(color) {
+  flashEl.className = `flash-overlay flash-${color}`;
+  flashEl.style.opacity = '1';
+  setTimeout(() => { flashEl.style.opacity = '0'; }, 120);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CAMERA SETUP
+// ═══════════════════════════════════════════════════════════════
+async function startCamera() {
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 1280, height: 720, facingMode: 'user' }, audio: false
+    });
+    video.srcObject = camStream;
+    await new Promise(r => video.onloadedmetadata = r);
+    video.play();
+    camPlaceholder.style.display = 'none';
+    return true;
+  } catch(e) {
+    statusBanner.textContent = '⚠ Camera access denied — please allow camera access.';
+    statusBanner.className = 'status-banner red';
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MOTION DETECTION
+//  Algorithm:
+//    1. Capture current frame, scale to PROC_WIDTH for speed
+//    2. Convert to grayscale (luminance formula)
+//    3. Per-pixel absolute difference vs previous grayscale frame
+//    4. motion_score = mean(diff) / 255.0
+//    5. EMA smoothing for display only; raw score used for decisions
+// ═══════════════════════════════════════════════════════════════
+function computeMotion() {
+  const vw = video.videoWidth, vh = video.videoHeight;
+  if (!vw || !vh) return 0;
+
+  // Scale to processing resolution
+  const pw = CFG.PROC_WIDTH;
+  const ph = Math.round(vh * (pw / vw));
+  procCanvas.width  = pw;
+  procCanvas.height = ph;
+
+  // Draw current frame at reduced size
+  procCtx.drawImage(video, 0, 0, pw, ph);
+  const imgData = procCtx.getImageData(0, 0, pw, ph).data;
+  const n = pw * ph;
+
+  // Grayscale conversion: luminance = 0.299R + 0.587G + 0.114B
+  const currGray = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const r = imgData[i*4], g = imgData[i*4+1], b = imgData[i*4+2];
+    currGray[i] = (0.299*r + 0.587*g + 0.114*b) | 0;
+  }
+
+  // Frame difference
+  let score = 0;
+  if (prevGray && prevGray.length === n) {
+    let sum = 0;
+    for (let i = 0; i < n; i++) sum += Math.abs(currGray[i] - prevGray[i]);
+    score = (sum / n) / 255.0;
+  }
+
+  prevGray = currGray;
+  return score;
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  RENDER (display canvas)
+//  Mirrors image (selfie feel); grayscale applied during RED/DEAD
+// ═══════════════════════════════════════════════════════════════
+function renderCam(grayscale) {
+  if (!video.videoWidth) return;
+  canvas.width  = canvas.clientWidth  * (devicePixelRatio || 1);
+  canvas.height = canvas.clientHeight * (devicePixelRatio || 1);
+
+  // Mirror horizontally for natural selfie view
+  ctx.save();
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
+  // Desaturate to grayscale
+  if (grayscale) {
+    const id = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d  = id.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const g = 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+      d[i] = d[i+1] = d[i+2] = g;
+    }
+    ctx.putImageData(id, 0, 0);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STATE TRANSITIONS
+// ═══════════════════════════════════════════════════════════════
+function enterGreen() {
+  state      = S.GREEN;
+  phaseStart = performance.now();
+  phaseDur   = greenDur();
+  idleStart  = phaseStart;   // begin idle timer immediately
+  flash('green');
+  overlayDead.classList.remove('visible');
+  updateUI();
+}
+
+function enterRed() {
+  state      = S.RED;
+  phaseStart = performance.now();
+  phaseDur   = redDur();
+  graceStart = phaseStart;
+  flash('red');
+  updateUI();
+}
+
+function enterDead(reason) {
+  state       = S.DEAD;
+  deathReason = reason;
+  deathLabel.textContent = reason;
+  flash('red');
+  overlayDead.classList.add('visible');
+  updateUI();
+}
+
+function enterLevelUp() {
+  state = S.LEVEL_UP;
+  level++;
+  cycle = 0;
+  levelupText.textContent = `LEVEL ${level}!`;
+  overlayLvl.classList.add('visible');
+  updateUI();
+  setTimeout(() => {
+    overlayLvl.classList.remove('visible');
+    enterGreen();
+  }, 2400);
+}
+
+// At end of GREEN phase — advance cycle or level
+function onGreenPhaseEnd() {
+  cycle++;
+  if (cycle >= cyclesNeeded) {
+    enterLevelUp();
+  } else {
+    enterRed();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MAIN GAME LOOP (requestAnimationFrame)
+// ═══════════════════════════════════════════════════════════════
+function tick() {
+  const now = performance.now();
+
+  // Step 1: compute motion from latest camera frame
+  rawMotion    = computeMotion();
+  smoothMotion = smoothMotion*(1-CFG.MOTION_SMOOTH) + rawMotion*CFG.MOTION_SMOOTH;
+
+  const elapsed   = now - phaseStart;
+  const remaining = Math.max(0, phaseDur - elapsed);
+
+  // Step 2: apply game rules
+  if (state === S.GREEN || state === S.WARNING) {
+    // --- GREEN rules ---
+    const isMoving = rawMotion >= CFG.GREEN_MOVE_THRESHOLD;
+
+    if (isMoving) {
+      idleStart = now;                              // reset idle clock
+      if (state === S.WARNING) state = S.GREEN;     // recover from warning
+    } else {
+      const idleElapsed = now - idleStart;
+      if (idleElapsed >= CFG.IDLE_DEATH_MS) {
+        // Idle too long → DEAD
+        enterDead('Died: stayed still too long!');
+        rafId = requestAnimationFrame(tick); return;
+      } else if (idleElapsed >= CFG.IDLE_WARNING_MS) {
+        // Approaching idle death → WARNING
+        state = S.WARNING;
+      }
+    }
+
+    // Green phase timer expired → advance
+    if (elapsed >= phaseDur) {
+      onGreenPhaseEnd();
+      rafId = requestAnimationFrame(tick); return;
+    }
+
+  } else if (state === S.RED) {
+    // --- RED rules ---
+    const graceElapsed = now - graceStart;
+
+    if (graceElapsed > CFG.RED_GRACE_MS) {
+      // Grace window over; any motion above threshold = death
+      if (rawMotion > redThresh()) {
+        enterDead('Died: moved during RED light!');
+        rafId = requestAnimationFrame(tick); return;
+      }
+    }
+
+    // RED phase expired without violation → back to GREEN
+    if (elapsed >= phaseDur) {
+      enterGreen();
+      rafId = requestAnimationFrame(tick); return;
+    }
+  }
+  // S.DEAD and S.LEVEL_UP are passive (no logic here; transitions handled in enterLevelUp / user restart)
+
+  // Step 3: render frame
+  const useGrayscale = (state === S.RED || state === S.DEAD);
+  renderCam(useGrayscale);
+
+  // Step 4: update meters & labels
+  updateMeters(remaining, now);
+
+  rafId = requestAnimationFrame(tick);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  UI UPDATES
+// ═══════════════════════════════════════════════════════════════
+function updateUI() {
+  // Body ambient class
+  const bodyClass = { [S.GREEN]:'state-green', [S.WARNING]:'state-warn',
+    [S.RED]:'state-red', [S.DEAD]:'state-dead',
+    [S.LEVEL_UP]:'state-green', [S.IDLE]:'state-idle' }[state] || 'state-idle';
+  document.body.className = bodyClass;
+
+  // Camera border glow
+  const wClass = { [S.GREEN]:'green', [S.WARNING]:'warn', [S.RED]:'red', [S.DEAD]:'dead' }[state] || '';
+  camWrapper.className = `cam-wrapper ${wClass}`;
+
+  // Status light LEDs
+  lightGreen.classList.toggle('on', [S.GREEN, S.WARNING, S.LEVEL_UP].includes(state));
+  lightRed.classList.toggle('on',   [S.RED, S.DEAD].includes(state));
+
+  // Status banner
+  const banners = {
+    [S.IDLE]:    ['Waiting to start…', ''],
+    [S.GREEN]:   ['🟢  Green light — keep moving!', 'green'],
+    [S.WARNING]: ['⚠️  Warning — move now or die!', 'warn'],
+    [S.RED]:     ['🔴  Red light — FREEZE!', 'red'],
+    [S.DEAD]:    [`💀  ${deathReason}`, 'dead'],
+    [S.LEVEL_UP]:['⬆️  Level Up! Get ready…', 'green'],
+  };
+  const [msg, cls] = banners[state] || ['—',''];
+  statusBanner.textContent = msg;
+  statusBanner.className   = `status-banner ${cls}`;
+
+  // Stat boxes
+  statLevel.textContent = state === S.IDLE ? '—' : level;
+  statCycle.textContent = state === S.IDLE ? '—' : `${cycle}/${cyclesNeeded}`;
+  statState.textContent = state;
+  statState.className = `stat-value ${
+    [S.GREEN, S.LEVEL_UP].includes(state) ? 'green' :
+    [S.RED, S.DEAD].includes(state) ? 'red' :
+    state === S.WARNING ? 'warn' : ''
+  }`;
+
+  // Light label
+  const ltText = { [S.GREEN]:'GREEN', [S.WARNING]:'WARNING', [S.RED]:'RED',
+    [S.DEAD]:'DEAD', [S.LEVEL_UP]:'LEVEL UP', [S.IDLE]:'—' }[state] || '—';
+  const ltCls  = [S.GREEN, S.LEVEL_UP].includes(state) ? 'green' :
+    [S.RED, S.DEAD].includes(state) ? 'red' : state === S.WARNING ? 'warn' : '';
+  lightText.textContent = ltText;
+  lightText.className   = `light-text ${ltCls}`;
+
+  renderCycleDots();
+}
+
+function renderCycleDots() {
+  cycleDots.innerHTML = '';
+  for (let i = 0; i < cyclesNeeded; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i < cycle ? ' done' : (i === cycle && state !== S.IDLE ? ' curr' : ''));
+    cycleDots.appendChild(d);
+  }
+}
+
+function updateMeters(remaining, now) {
+  // Motion bar — green when moving (above threshold), red when dangerously still (RED state)
+  const motPct = Math.min(smoothMotion / 0.15 * 100, 100);
+  motionBar.style.width = motPct + '%';
+  motionBar.className = `meter-fill ${
+    state === S.RED ? (rawMotion > redThresh() ? 'red' : '') :
+    (rawMotion < CFG.GREEN_MOVE_THRESHOLD && state !== S.IDLE ? 'red' : '')
+  }`;
+  motionVal.textContent  = smoothMotion.toFixed(4);
+  statMotion.textContent = smoothMotion.toFixed(3);
+
+  // Phase timer (counts down)
+  const phasePct = phaseDur > 0 ? (remaining / phaseDur * 100) : 0;
+  phaseBar.style.width = phasePct + '%';
+  phaseBar.className   = `meter-fill ${state === S.RED ? 'red' : state === S.WARNING ? 'warn' : ''}`;
+  phaseVal.textContent = (remaining / 1000).toFixed(1) + 's';
+
+  // Idle timer (GREEN/WARNING) or grace timer (RED)
+  if (state === S.GREEN || state === S.WARNING) {
+    const idleElapsed = now - idleStart;
+    const idlePct = Math.min(idleElapsed / CFG.IDLE_DEATH_MS * 100, 100);
+    idleBar.style.width = idlePct + '%';
+    idleBar.className   = `meter-fill ${
+      idleElapsed >= CFG.IDLE_WARNING_MS ? 'red' :
+      idleElapsed >= CFG.IDLE_WARNING_MS * 0.55 ? 'warn' : ''
+    }`;
+    idleVal.textContent = (idleElapsed / 1000).toFixed(1) + 's idle';
+  } else if (state === S.RED) {
+    const gEl  = now - graceStart;
+    const gPct = Math.min(gEl / CFG.RED_GRACE_MS * 100, 100);
+    idleBar.style.width = gPct + '%';
+    idleBar.className   = `meter-fill ${gPct >= 100 ? 'red' : 'warn'}`;
+    idleVal.textContent = gPct >= 100 ? 'LIVE!' : 'grace';
+  } else {
+    idleBar.style.width = '0%';
+    idleVal.textContent = '—';
+  }
+
+  renderCycleDots();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  GAME CONTROL
+// ═══════════════════════════════════════════════════════════════
+async function startGame() {
+  if (!camStream) {
+    const ok = await startCamera();
+    if (!ok) return;
+  }
+  btnStart.disabled = true;
+
+  // Reset
+  level = 1; cycle = 0;
+  prevGray = null; smoothMotion = 0; deathReason = '';
+  overlayDead.classList.remove('visible');
+  overlayLvl.classList.remove('visible');
+
+  // Brief warmup so first diff isn't a garbage spike
+  await new Promise(r => setTimeout(r, 300));
+
+  if (rafId) cancelAnimationFrame(rafId);
+  enterGreen();
+  rafId = requestAnimationFrame(tick);
+}
+
+function restartGame() {
+  if (rafId) cancelAnimationFrame(rafId);
+  state = S.IDLE;
+  overlayDead.classList.remove('visible');
+  overlayLvl.classList.remove('visible');
+  btnStart.disabled = false;
+  level = 1; cycle = 0;
+  smoothMotion = 0;
+  updateUI();
+
+  // Keep rendering idle preview if cam is open
+  if (camStream) {
+    (function idleLoop() {
+      if (state !== S.IDLE) return;
+      renderCam(false);
+      rafId = requestAnimationFrame(idleLoop);
+    })();
+  }
+}
+
+btnStart.addEventListener('click', startGame);
+btnRestart.addEventListener('click', restartGame);
+
+// Initial render
+updateUI();
+</script>
+</body>
+</html>
