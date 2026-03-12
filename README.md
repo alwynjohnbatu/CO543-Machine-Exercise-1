@@ -9,7 +9,7 @@ This repository contains a web-based implementation of the "Red Light Green Ligh
 
 ## Files Included
 * `rlgl.html`: The web application source code containing the UI, frame preprocessing, and state machine logic.
-* `CO_543_Report.pdf`: A short report detailing the algorithm design, parameter tuning, and observed failure cases.
+* `CO543-ME1.pdf`: A short report detailing the algorithm design, parameter tuning, and observed failure cases.
 * `README.md`: This document, containing the project overview and demonstration link.
 
 ## How to Run
